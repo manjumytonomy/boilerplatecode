@@ -3,7 +3,7 @@ import os
 import pandas as pd
 
 word_docs_path = "/Users/vikram/Work/Mytonomy/WE Stage/Folder Storage/super_admin/Word Docs"
-excel_save_path = "output1.xlsx"
+excel_save_path = "/Users/vikram/Work/Mytonomy/WE Stage/Folder Storage/super_admin/EpicMetaTagSpreadsheet/customer-epic-ready.xlsx"
 
 column_titles = ["Customer", "Logo", "Condition Area", "Filepath", "Title", "Unique Name", "Keyword", "Diagnosis Code", "CPT Code", 
                 "Language", "Corresponding Language", "Language Index", "Source", "Document Type", "QR Code", "Short URL", "Customer Disclaimer"]
