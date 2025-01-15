@@ -348,7 +348,7 @@ class EpicMetaTagComplianceValidator:
         self.update_sheet(sheet_name, filepath, filename, issue_description, issue_status)
 
 
-    def validate_package(self):
+    def validate_spreadsheet(self):
         total_issues = {sheet_name: 0 for sheet_name in self.sheets}
         self.setUp()
 
