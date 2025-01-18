@@ -108,7 +108,9 @@ class EpicMetaTagComplianceValidator:
             "Unique Name Check": self.workbook.create_sheet(title="Unique Name Check"),
             "Keyword Check": self.workbook.create_sheet(title="Keyword Check"),
             "Language Check": self.workbook.create_sheet(title="Language Check"),
-            "Filename Check": self.workbook.create_sheet(title="Filename Check")
+            "Filename Check": self.workbook.create_sheet(title="Filename Check"),
+            "Diagnosis Code Check": self.workbook.create_sheet(title="Diagnosis Code Check"),
+            "CPT Code Check": self.workbook.create_sheet(title="CPT Code Check")
         }
         
         # Initialize headers for each sheet
@@ -178,7 +180,7 @@ class EpicMetaTagComplianceValidator:
         chars_to_detect = "[],|^"
         tab = '<tab>'
         
-        if not title_content or len(title_content) == 0:
+        if not (type(title_content) == str and len(title_content) > 0):
             self.logger.error(f"Empty title tag in file {filename}\n")
             errorlist.append(f"Empty title tag in file {filename}")   
         else: 
@@ -216,7 +218,7 @@ class EpicMetaTagComplianceValidator:
 
         # Logic Starts ############################################################################################
         unique_name = row_dict[COLS['unique_name']]
-        if not unique_name or len(unique_name) == 0:
+        if not (type(unique_name) == str and len(unique_name) > 0):
             self.logger.error(f"Empty unique name tag in file {filename}: {unique_name}\n")
             errorlist.append(f"Empty unique name tag in file {filename}: {unique_name}")
         elif len(unique_name) > 192 or not re.match(r'^[a-zA-Z0-9\-_.]+$', unique_name):
@@ -249,24 +251,31 @@ class EpicMetaTagComplianceValidator:
         sheet_name = "Keyword Check"
 
         # Logic Starts ############################################################################################
-        keyword = row_dict[COLS['keyword']]
-        if not keyword or len(keyword) == 0:
+        keywords = row_dict[COLS['keyword']]
+        if not (type(keywords) == str and len(keywords) > 0):
             self.logger.error(f"Empty Keyword Tag in file {filename}\n")
             errorlist.append(f"Empty Keyword Tag in file {filename}")
         else:
-            keywords = keyword.split(',')
-            for word in keywords:
-                if len(word) > 184:
-                    self.logger.error(f"Keyword longer than 184 characters in file {filename}: {len(word)}\n")
-                    errorlist.append(f"Keyword longer than 184 characters in file {filename}: {len(word)}")
-            
-            if len(keywords) > 500:
-                self.logger.error(f"More than 500 keywords detected in file {filename}\n")
-                errorlist.append(f"More than 500 keywords detected in file {filename}")
+            keywords_pattern = re.compile(r'\b[A-Za-z ]+(?=,|\b)')
+            if not keywords_pattern.match(keywords):
+                self.logger.error(f"Invalid syntax for Keywords. Only comma-separated English words are allowed\n")
+                errorlist.append(f"Invalid syntax for Keywords. Only comma-separated English words are allowed")
+            else:
+                keyword_list = keywords.split(',')
+                for word in keyword_list:
+                    if len(word) > 184:
+                        self.logger.error(f"Keyword longer than 184 characters in file {filename}: {len(word)} characters\n")
+                        errorlist.append(f"Keyword longer than 184 characters in file {filename}: {len(word)} characters")
+                        break
 
-            if detect(keywords) != 'en':
-                self.logger.error(f"Non-english keywords detected in file {filename}\n")
-                errorlist.append(f"Non-english keywords detected in file {filename}")
+                    # if detect(word) != 'en':
+                    #     self.logger.error(f"Non-english keywords detected in file {filename}\n")
+                    #     errorlist.append(f"Non-english keywords detected in file {filename}")
+                    #     break
+                
+                if len(keywords) > 500:
+                    self.logger.error(f"More than 500 keywords detected in file {filename}\n")
+                    errorlist.append(f"More than 500 keywords detected in file {filename}")
         # Logic Ends ##############################################################################################
         
         # Determine issue status based on the errorlist
@@ -289,7 +298,7 @@ class EpicMetaTagComplianceValidator:
 
         # Logic Starts ############################################################################################
         language_content = row_dict[COLS['language']]
-        if not language_content or len(language_content) == 0:
+        if not (type(language_content) == str and len(language_content) > 0):
             self.logger.error(f'Empty Language Tag in file {filename}.')
             errorlist.append(f'Empty Language Tag in file {filename}.')
         else:
@@ -302,10 +311,10 @@ class EpicMetaTagComplianceValidator:
                 self.logger.error(f'Mismatch: Filename (\'ES\' in filename: {has_es_in_filename}) and Language meta tag (\'{language_content}\') do not align in file {filename}.')
                 errorlist.append(f'Mismatch: Filename (\'ES\' in filename: {has_es_in_filename}) and Language meta tag (\'{language_content}\') do not align in file {filename}.')
                 
-        languages = language_content.strip().split()
-        if len(languages) > 1:
-            self.logger.error(f'Found multiple Language Tags in file {filename}.')
-            errorlist.append(f'Found multiple Language Tags in file {filename}.')
+            languages = language_content.strip().split()
+            if len(languages) > 1:
+                self.logger.error(f'Found multiple Language Tags in file {filename}.')
+                errorlist.append(f'Found multiple Language Tags in file {filename}.')
         # Logic Ends ##############################################################################################
         
         # Determine issue status based on the errorlist
@@ -347,35 +356,93 @@ class EpicMetaTagComplianceValidator:
 
         self.update_sheet(sheet_name, filepath, filename, issue_description, issue_status)
 
+    
+    def validate_diagnosis_code(self, total_issues, row_dict):
+        filepath = row_dict[COLS['filepath']]
+        filename = os.path.basename(filepath)
+        errorlist = []
+        sheet_name = "Diagnosis Code Check"
 
-    def validate_spreadsheet(self):
-        total_issues = {sheet_name: 0 for sheet_name in self.sheets}
-        self.setUp()
+        # Logic Starts ############################################################################################
+        icd_codes = row_dict[COLS['diagnosis_code']]
+        if not (type(icd_codes) == str and len(icd_codes) > 0):
+            self.logger.error(f'Empty ICD Code Tag in file {filename}.')
+            errorlist.append(f'Empty ICD Code Tag in file {filename}.')
+        else:
+            patterns = {'icd9_pattern': {"valid": [], "invalid": [], 'pattern': re.compile(r'^\d{3}(\.\d{1,2})?$')}, 
+                        'icd10_cm_pattern': {"valid": [], "invalid": [], 'pattern': re.compile(r'^[A-Z]\d{2}(\.\w{1,4})?$')}, 
+                        'icd10_ca_pattern': {"valid": [], "invalid": [], 'pattern': re.compile(r'^[A-Z][0-9]\.(\w{1,3})?$')}, 
+                        'icd10_uk_pattern': {"valid": [], "invalid": [], 'pattern': re.compile(r'^[A-Z]{3}\.\d{3}$')}, 
+                        'icd10_am_pattern': {"valid": [], "invalid": [], 'pattern': re.compile(r'^[A-Z][0-9]\.\w{1,4}([A-Z0-9])?$')}}
+            
+            # Split the input string by commas and strip whitespace
+            codes = [code.strip() for code in icd_codes.split(",")]
+            
+            for key in patterns:
+                pattern = patterns[key]['pattern']
+                # Classify codes as valid or invalid
+                patterns[key]['valid'] = [code for code in codes if pattern.match(code)]
+                patterns[key]['invalid'] = [code for code in codes if not pattern.match(code)]
 
-        for index, row in self.df.iterrows():
-            row_num = index + 1
-            row_dict = row.to_dict()
-            print(f"Index: {index}, Row: {row.to_dict()}")
-            self.validate_title(total_issues, row_dict)
-            self.validate_unique_name(total_issues, row_dict)
-            self.validate_keywords(total_issues, row_dict)
-            self.validate_language(total_issues, row_dict)
-            #self.validate_filename(total_issues, row_dict)
+            check = False
+            for key in patterns:
+                if len(patterns[key]['invalid']) == 0:
+                    check = True
+                    break
 
-        # Add totals row at the bottom of each sheet
-        for sheet_name, sheet in self.sheets.items():
-            total_files_with_issues = total_issues[sheet_name]
-            sheet.append(["", "", "", f"Total Files with Issues: {total_files_with_issues}"])
-            sheet.append([""])  # Blank row for better readability
+            if not check:
+                self.logger.error(f'Invalid ICD Codes detected in file {filename}.')
+                errorlist.append(f'Invalid ICD Codes detected in file {filename}.')
+        # Logic Ends ##############################################################################################
+        
+        # Determine issue status based on the errorlist
+        if errorlist:
+            issue_status = "Issue Found"
+            issue_description = f"Diagnosis code validation failed with {len(errorlist)} error(s): {', '.join(errorlist[:3])}"  # Show the first 3 errors
+            total_issues[sheet_name] += 1
+        else:
+            issue_status = "No Issue"
+            issue_description = "Diagnosis codes meet EPIC specifications"
 
-        self.generate_summary()
+        self.update_sheet(sheet_name, filepath, filename, issue_description, issue_status)
 
-        # Generate a unique filename using customer name, date, and time
-        current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        report_filename = f"{customer}_EpicComplianceReport_{current_datetime}.xlsx"
+    
+    def validate_cpt_code(self, total_issues, row_dict):
+        filepath = row_dict[COLS['filepath']]
+        filename = os.path.basename(filepath)
+        errorlist = []
+        sheet_name = "CPT Code Check"
 
-        # Save the workbook with the generated filename
-        self.workbook.save(os.path.join(script_dir, report_filename))
+        # Logic Starts ############################################################################################
+        cpt_codes = row_dict[COLS['cpt_code']]
+        if not (type(cpt_codes) == str and len(cpt_codes) > 0):
+            self.logger.error(f'Empty CPT Code Tag in file {filename}.')
+            errorlist.append(f'Empty CPT Code Tag in file {filename}.')
+        else:
+            cpt_pattern = re.compile(r'^[A-Z0-9]{5}$')
+
+            # Split the input string by commas and strip whitespace
+            codes = [code.strip() for code in cpt_codes.split(",")]
+            
+            # Classify codes as valid or invalid
+            valid_codes = [code for code in codes if cpt_pattern.match(code)]
+            invalid_codes = [code for code in codes if not cpt_pattern.match(code)]
+
+            if len(invalid_codes) > 0:
+                self.logger.error(f'Invalid CPT Codes detected in file {filename}.')
+                errorlist.append(f'Invalid CPT Codes detected in file {filename}.')
+        # Logic Ends ##############################################################################################
+        
+        # Determine issue status based on the errorlist
+        if errorlist:
+            issue_status = "Issue Found"
+            issue_description = f"CPT code validation failed with {len(errorlist)} error(s): {', '.join(errorlist[:3])}"  # Show the first 3 errors
+            total_issues[sheet_name] += 1
+        else:
+            issue_status = "No Issue"
+            issue_description = "CPT codes meet EPIC specifications"
+
+        self.update_sheet(sheet_name, filepath, filename, issue_description, issue_status)
    
 
     def generate_summary(self):
@@ -448,3 +515,32 @@ class EpicMetaTagComplianceValidator:
         for row in self.summary_sheet.iter_rows(min_row=2, max_row=self.summary_sheet.max_row, min_col=1, max_col=self.summary_sheet.max_column):
             for cell in row:
                 cell.alignment = Alignment(wrap_text=True)
+
+
+    def validate_spreadsheet(self):
+        total_issues = {sheet_name: 0 for sheet_name in self.sheets}
+        self.setUp()
+
+        for index, row in self.df.iterrows():
+            row_num = index + 1
+            row_dict = row.to_dict()
+            self.validate_title(total_issues, row_dict)
+            self.validate_unique_name(total_issues, row_dict)
+            self.validate_keywords(total_issues, row_dict)
+            self.validate_language(total_issues, row_dict)
+            self.validate_filename(total_issues, row_dict)
+            self.validate_diagnosis_code(total_issues, row_dict)
+            self.validate_cpt_code(total_issues, row_dict)
+
+        # Add totals row at the bottom of each sheet
+        for sheet_name, sheet in self.sheets.items():
+            total_files_with_issues = total_issues[sheet_name]
+            sheet.append(["", "", "", f"Total Files with Issues: {total_files_with_issues}"])
+            sheet.append([""])  # Blank row for better readability
+
+        self.generate_summary()
+
+        report_filename = f"{customer}_MetaTagSpreadsheetValidationReport.xlsx"
+
+        # Save the workbook with the generated filename
+        self.workbook.save(os.path.join(st.session_state['SPREADSHEET_DIR'], report_filename))
