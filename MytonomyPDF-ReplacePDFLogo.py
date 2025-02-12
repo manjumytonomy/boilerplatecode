@@ -4,20 +4,16 @@ import fitz  # PyMuPDF
 import pandas as pd
 
 # INPUT 1
-folder_path = "/Users/vikram/Work/Mytonomy/Latest/LogoReplacement/Mytonomy_WE"
+#folder_path = "/Users/vikram/Work/Mytonomy/Latest/LogoReplacement/Mytonomy_WE"
 #folder_path = "/Users/manju/Work/WrittenEducation Project/Customer Releases/AAH/PDFs/AAH 401_02_07_25-A-D/Mytonomy WE/English/A"
 #folder_path = "/Users/manju/Work/WrittenEducation Project/Customer Releases/AAH/PDFs/Test batch 113_01_17_25 Epic Ready/Clara Project/ENGLISH"
-
+folder_path = "/Users/manju/Work/WrittenEducation Project/Customer Releases/AAH/PDFs/AAH 326_02_11_25-E-J/PDFs/Mytonomy WE/English"
 # INPUT 2
-logo_file = "/Users/vikram/Work/Mytonomy/Latest/LogoReplacement/Mytonomy_logo.jpeg"
+#logo_file = "/Users/vikram/Work/Mytonomy/Latest/LogoReplacement/Mytonomy_logo.jpeg"
 #logo_file = "/Users/manju/Work/WrittenEducation Project/Customer Releases/Inova/Clinical References Root_FULL_August_21_24/HTML/Images/Inova logo.png"
-#logo_file = "/Users/manju/Work/WrittenEducation Project/Customer Releases/Carolina East/Nov1-EpicTesting-HTML Package/HTML/Images/Mytonomy_logo.png"
+logo_file = "/Users/manju/Work/WrittenEducation Project/Customer Releases/Carolina East/Nov1-EpicTesting-HTML Package/HTML/Images/Mytonomy_logo.png"
 
 # INPUT 3
-output_folder_path = os.path.join(os.path.dirname(folder_path), os.path.basename(folder_path) + "Mytonomy-Updated")
-#output_folder_path = os.path.join(os.path.dirname(folder_path), os.path.basename(folder_path) + "Inova-Updated")
-
-# INPUT 4
 customer = 'Mytonomy'
 
 config = {
@@ -30,6 +26,7 @@ config = {
         'scale': 1
     }
 }
+# target_rect = (68.6, -43.46, 248.35, 100.54)
 
 def replace_image_at_coordinates(pdf_file, logo_file, output_file, target_rect):
     doc = fitz.open(pdf_file)
@@ -78,6 +75,8 @@ def main():
 
     df = pd.DataFrame(columns=['Filepath', 'Total Pages', 'Total Images Replaced', 'Match'])
 
+    output_folder_path = os.path.join(os.path.dirname(folder_path), os.path.basename(folder_path) + "Mytonomy-Updated")
+    #output_folder_path = os.path.join(os.path.dirname(folder_path), os.path.basename(folder_path) + "Inova-Updated")
     # If the output directory exists, delete its contents
     if os.path.exists(output_folder_path):
         for root, dirs, files in os.walk(output_folder_path):
@@ -114,9 +113,7 @@ def main():
     df["Total Pages"] = total_pages
     df["Total Images Replaced"] = total_images_replaced
     df["Match"] = df["Total Pages"] == df["Total Images Replaced"]
-    error_count = (df["Match"] == "FALSE").sum()
-    print(f'Number of files with errors: {error_count}')
-    df.to_excel(f'{folder}-PDFLogoReplacement.xlsx')
+    df.to_excel(f'{folder}-LogoReplacement.xlsx')
     
 
 if __name__ == '__main__':
