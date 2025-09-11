@@ -3,12 +3,9 @@ import xlsxwriter
 
 # --- CONFIGURATION ---
 # Set your spreadsheet paths here
-# path_june26 = '/mnt/c/Users/bhoom/Downloads/Mytonomy Consolidated Package MetaData Extract June 26 2025 Snapshot (1).xlsx'
-# path_nlp = '/mnt/c/Users/bhoom/Downloads/Batch 1 - 3 Metadata Updated with Integrated Tool (1).xlsx'
-# path_imo = '/mnt/c/Users/bhoom/Downloads/Sep-06-2025-English 1631 PDFs Epic Metadata (1).xlsx'
-path_june26 = '/Users/vikram/Downloads/Mytonomy Consolidated Package MetaData Extract June 26 2025 Snapshot English.xlsx'
-path_nlp = '/Users/vikram/Downloads/Batch 1 - 3 Metadata Updated with Integrated Tool English.xlsx'
-path_imo = '/Users/vikram/Downloads/Sep-08-2025-English 1631 PDFs Epic Metadata.xlsx'
+path_june26 = '/mnt/c/Users/bhoom/Downloads/Mytonomy Consolidated Package MetaData Extract June 26 2025 Snapshot.xlsx'
+path_nlp = '/mnt/c/Users/bhoom/Downloads/Batch 1 - 3 Metadata Updated with Integrated Tool.xlsx'
+path_imo = '/mnt/c/Users/bhoom/Downloads/Sep-08-2025-English 1631 PDFs Epic Metadata (1).xlsx'
 
 # --- UTILITY FUNCTIONS ---
 
@@ -59,8 +56,8 @@ lookup_imo = build_lookup(df_imo, is_imo=True)
 lookup_nlp = build_lookup(df_nlp)
 
 # Use Filepath as the match key
-all_match_keys = set(lookup_june26.keys()) | set(lookup_imo.keys()) | set(lookup_nlp.keys())
-
+#all_match_keys = set(lookup_june26.keys()) | set(lookup_imo.keys()) | set(lookup_nlp.keys())
+all_match_keys = set(lookup_imo.keys())
 # --- COMPARISON FUNCTION ---
 
 
@@ -73,7 +70,9 @@ def make_comparison_sheet(main_lookup, compare_lookup, main_label, compare_label
         compare_keywords_set = compare_info['keywords_set']
         addition = main_keywords_set - compare_keywords_set
         deletion = compare_keywords_set - main_keywords_set
-        output_rows.append({
+        # For union column (unique values from both sets)
+        union_keywords = main_keywords_set | compare_keywords_set
+        output_row = {
             f'File Name {main_label}': main_info['filepath'],
             f'Keywords {main_label}': main_info['keywords_str'],
             f'File Name {compare_label}': compare_info['filepath'],
@@ -83,7 +82,12 @@ def make_comparison_sheet(main_lookup, compare_lookup, main_label, compare_label
             'Deletion': ', '.join(sorted(deletion)),
             'Deletion Count': len(deletion),
             'Difference Count': len(addition) + len(deletion),
-        })
+        }
+        # Only add the union column for June26 vs IMO sheet
+        if (main_label == 'June26' and compare_label == 'IMO') or (main_label == 'IMO' and compare_label == 'June26'):
+            output_row['Unique Keywords (IMO and June26)'] = ', '.join(sorted(union_keywords))
+            output_row['Unique Keywords (IMO and June26) Count'] = len(union_keywords)
+        output_rows.append(output_row)
     columns = [
         f'File Name {main_label}',
         f'Keywords {main_label}',
@@ -95,6 +99,10 @@ def make_comparison_sheet(main_lookup, compare_lookup, main_label, compare_label
         'Deletion Count',
         'Difference Count',
     ]
+    # Add the union columns if this is the June26 vs IMO comparison
+    if (main_label == 'June26' and compare_label == 'IMO') or (main_label == 'IMO' and compare_label == 'June26'):
+        columns.append('Unique Keywords (IMO and June26)')
+        columns.append('Unique Keywords (IMO and June26) Count')
     df = pd.DataFrame(output_rows, columns=columns)
     df.sort_values(by=f'File Name {main_label}', ascending=True, inplace=True)
     return df
@@ -140,8 +148,9 @@ with pd.ExcelWriter('KeywordComparisonReport.xlsx', engine='xlsxwriter') as writ
         add_format = workbook.add_format({'bg_color': '#C6EFCE', 'border': 1, 'text_wrap': True})  # Green for Addition
         del_format = workbook.add_format({'bg_color': '#FFC7CE', 'border': 1, 'text_wrap': True})  # Red for Deletion
         wrap_format = workbook.add_format({'text_wrap': True})
-        # Set fixed column widths for readability
         col_widths = {
+            'Unique Keywords (IMO and June26)': 50,  # Fixed length for readability
+            'Unique Keywords (IMO and June26) Count': 40,  # Fixed length for count column
             'File Name June26': 30,
             'File Name IMO': 30,
             'File Name NLP_CDC_Alex': 30,
